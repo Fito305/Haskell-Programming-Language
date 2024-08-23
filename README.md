@@ -1,0 +1,1 @@
+Haskell is a general-purpose programming language. It was designed without any application niche in mind. Although it takes a strong stand on how programs should be written, it does not favor one problem domain over others.
