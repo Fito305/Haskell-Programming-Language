@@ -1,3 +1,6 @@
+import Data.Function
+
+
 -- | Strict left fold, similar to foldl' on lists.
 foldA :: Ix k => (a -> b -> a) -> a -> Array k b -> a
 foldA f s a = go s (indices a)
@@ -92,3 +95,78 @@ runLength = map rle . group
 
 runLengths :: Eq a => [a] -> [Run]
 runLengths = map fst . runLength
+
+type Score = Ratio Int
+
+scaleToOne :: [Run] -> [Score]
+scaleToOne xs = map divide xs
+    where divide d = fromIntegral d / divisor
+          divisor = fromIntegral (sum xs)
+-- A more compact alternative that "knows" we're using Ratio Int;
+-- scaleToOne xs = map (% sum xs) xs
+
+type ScoreTable = [[Score]]
+
+-- "SRL" means "scaled run length".
+asSRL :: [String] -> ScoreTable
+asSRL = map (scaleToOne . runLengths)
+
+leftOddSRL = asSRL leftOddList
+leftEvenSRL = asSRL leftEvenList
+rightSRL = asSRL rightList
+paritySRL = asSRL parityList
+
+distance :: [Score] -> [Score] -> Score
+distance a b = sum . map abs $ zipWith (-) a b
+
+bestrScores :: ScoreTable -> [Run] -> [(Score, Digit)]
+bestScores srl ps = take 3 . sort $ scores
+   where scores = zip [distance d (scaleToOne ps) | d <- srl] digits
+         digits = [0..9]
+
+-- our original
+zip [distance d (scaleToOne ps) | d <- srl] digits
+
+-- the same expression, expressed without a list comprehension
+zip (map (flip distance (scaleToOne ps)) srl) digits
+
+-- the same expression, written en tirely as a list comprehension
+[(distance d (scaleToOne ps), n) | d <- srl, n <- digits]
+
+data parity a = Even a | Odd a | None a
+                deriving (Show)
+
+fromParity :: Parity a -> a
+fromParity (Even a) = a
+fromParity (Odd a) = a
+fromParity (None a) = a
+
+parityMap :: (a -> b) -> Parity a -> Parity b
+parityMap f (Even a) = Even (f a)
+parityMap f (Odd a) = Odd (f a)
+parityMap f (None a) = None (f a)
+
+instance Functor Parity where
+   fmap = parityMap
+
+-- In the case it's unclear, try thing of `on` as a function of two arguments, f and g, which 
+-- return a function of two arguments, x and y. It applies g to x and to y, then f on the two results (hence the name on).
+on :: (a -> a -> b) -> (c -> a) -> c -> c -> b 
+on f g x y = g x `f` g y
+
+compareWithoutParity = compare `on` fromParity
+
+type Digit = Word8
+
+bestLeft :: [Run] -> [Parity (Score, Digit)]
+bestLeft ps = sortBy compareWithoutParityt
+              ((map Odd (bestScores leftOddSRL ps)) ++
+               (map Even (bestScores leftEvenSRL ps)))
+
+bestRight :: [Run] -> [Parity (Score, Digit)]
+bestRight = map None . bestScores rightSRL
+
+-- data ALtParity a = AltEven {fromAltParity :: a}
+--                  | AltOdd {fromAltParity :: a}
+--                  | AltNone {fromAltParity :: a}
+--                    deriving (Show)
